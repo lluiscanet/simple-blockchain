@@ -72,11 +72,8 @@ class Blockchain {
            block.time = new Date().getTime().toString().slice(0,-3);
            block.hash = SHA256(JSON.stringify(block)).toString();
            self.chain.push(block);
-           if (block){
-              resolve(block);
-           } else {
-             reject(Error("Unable to add block"));
-           }
+           self.validateChain()
+           resolve(block);
         });
     }
 
@@ -116,12 +113,12 @@ class Blockchain {
         return new Promise(async (resolve, reject) => {
               let messageTime = parseInt(message.split(':')[1]);
               let currentTime = parseInt(new Date().getTime().toString().slice(0, -3));
-              if ( (currentTime - messageTime < 5 * 60 * 1000) && bitcoinMessage.verify(message, address, signature)) {
-                let block = new BlockClass.Block({data: {'owner': address, 'star': star}});
-                block = self._addBlock(block)
-                resolve(block);
+              if ( (currentTime - messageTime < 5 * 60) && bitcoinMessage.verify(message, address, signature)) {
+                  let block = new BlockClass.Block({data: {'owner': address, 'star': star}});
+                  block = self._addBlock(block);
+                  resolve(block);
               } else {
-                reject("Error adding star");
+                  reject(Error("Error adding star"));
               }
         });
     }
@@ -177,15 +174,11 @@ class Blockchain {
               //avoid genesis block
               if (block.height > 0) {
                 let data = block.getBData();
-                console.log(data);
-                console.log(data.owner);
-                console.log(address);
                 if (data.owner === address) {
                   stars.push(data.star);
                 }
               }
             }
-            console.log(stars);
             if (stars.length > 0) {
               resolve(stars);
             } else {
@@ -209,12 +202,18 @@ class Blockchain {
         let previousHash = null;
         return new Promise(async (resolve, reject) => {
             for (const block of self.chain) {
-                if( ! (await block.validate()) || block.previousHash != previousHash) {
+                let valid = block.validate();
+                if( !valid || block.previousBlockHash != previousHash) {
                   errorLog.push(block);
                 }
                 previousHash = block.hash;
             }
-            resolve(errorLog);
+            if(errorLog.length == 0 ) {
+              resolve(errorLog);
+            } else {
+              reject(errorLog);
+            }
+
         });
     }
 
